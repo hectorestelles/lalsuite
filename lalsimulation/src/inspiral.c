@@ -219,6 +219,8 @@
 #define DEFAULT_LAMBDA2 0.0
 #define DEFAULT_DQUADMON1 0.0
 #define DEFAULT_DQUADMON2 0.0
+#define DEFAULT_MLENS 0.0
+#define DEFAULT_YLENS 1.0
 
 /* parameters given in command line arguments */
 struct params {
@@ -246,6 +248,8 @@ struct params {
     double s2y;
     double s2z;
     LALDict *params;
+    double MLens;
+    double yLens;
 };
 
 int usage(const char *program);
@@ -430,7 +434,7 @@ int create_td_waveform(REAL8TimeSeries ** h_plus, REAL8TimeSeries ** h_cross, st
             fprintf(stderr, "generating waveform in time domain using XLALSimInspiralTD...\n");
             timer_start = clock();
         }
-        XLALSimInspiralTD(h_plus, h_cross, p.m1, p.m2, p.s1x, p.s1y, p.s1z, p.s2x, p.s2y, p.s2z, p.distance, p.inclination, p.phiRef, p.longAscNodes, p.eccentricity, p.meanPerAno, 1.0 / p.srate, p.f_min, p.fRef, p.params, p.approx);
+        XLALSimInspiralTD(h_plus, h_cross, p.m1, p.m2, p.s1x, p.s1y, p.s1z, p.s2x, p.s2y, p.s2z, p.distance, p.inclination, p.phiRef, p.longAscNodes, p.eccentricity, p.meanPerAno, 1.0 / p.srate, p.f_min, p.fRef, p.params, p.MLens, p.yLens, p.approx);
         if (p.verbose)
             fprintf(stderr, "generation took %g seconds\n", (double)(clock() - timer_start) / CLOCKS_PER_SEC);
     } else if (p.domain == LAL_SIM_DOMAIN_TIME) {
@@ -439,7 +443,7 @@ int create_td_waveform(REAL8TimeSeries ** h_plus, REAL8TimeSeries ** h_cross, st
             fprintf(stderr, "generating waveform in time domain using XLALSimInspiralChooseTDWaveform...\n");
             timer_start = clock();
         }
-        XLALSimInspiralChooseTDWaveform(h_plus, h_cross, p.m1, p.m2, p.s1x, p.s1y, p.s1z, p.s2x, p.s2y, p.s2z, p.distance, p.inclination, p.phiRef, p.longAscNodes, p.eccentricity, p.meanPerAno, 1.0 / p.srate, p.f_min, p.fRef, p.params, p.approx);
+        XLALSimInspiralChooseTDWaveform(h_plus, h_cross, p.m1, p.m2, p.s1x, p.s1y, p.s1z, p.s2x, p.s2y, p.s2z, p.distance, p.inclination, p.phiRef, p.longAscNodes, p.eccentricity, p.meanPerAno, 1.0 / p.srate, p.f_min, p.fRef, p.params, p.MLens, p.yLens, p.approx);
         if (p.verbose)
             fprintf(stderr, "generation took %g seconds\n", (double)(clock() - timer_start) / CLOCKS_PER_SEC);
     } else {
@@ -464,7 +468,7 @@ int create_td_waveform(REAL8TimeSeries ** h_plus, REAL8TimeSeries ** h_cross, st
             fprintf(stderr, "generating waveform in frequency domain using XLALSimInspiralChooseFDWaveform...\n");
             timer_start = clock();
         }
-        XLALSimInspiralChooseFDWaveform(&htilde_plus, &htilde_cross, p.m1, p.m2, p.s1x, p.s1y, p.s1z, p.s2x, p.s2y, p.s2z, p.distance, p.inclination, p.phiRef, p.longAscNodes, p.eccentricity, p.meanPerAno, deltaF, p.f_min, 0.5 * p.srate, p.fRef, p.params, p.approx);
+        XLALSimInspiralChooseFDWaveform(&htilde_plus, &htilde_cross, p.m1, p.m2, p.s1x, p.s1y, p.s1z, p.s2x, p.s2y, p.s2z, p.distance, p.inclination, p.phiRef, p.longAscNodes, p.eccentricity, p.meanPerAno, deltaF, p.f_min, 0.5 * p.srate, p.fRef, p.params, p.MLens, p.yLens, p.approx);
         if (p.verbose)
             fprintf(stderr, "generation took %g seconds\n", (double)(clock() - timer_start) / CLOCKS_PER_SEC);
 
@@ -512,7 +516,7 @@ int create_fd_waveform(COMPLEX16FrequencySeries ** htilde_plus, COMPLEX16Frequen
             fprintf(stderr, "generating waveform in frequency domain using XLALSimInspiralFD...\n");
             timer_start = clock();
         }
-        XLALSimInspiralFD(htilde_plus, htilde_cross, p.m1, p.m2, p.s1x, p.s1y, p.s1z, p.s2x, p.s2y, p.s2z, p.distance, p.inclination, p.phiRef, p.longAscNodes, p.eccentricity, p.meanPerAno, deltaF, p.f_min, 0.5 * p.srate, p.fRef, p.params, p.approx);
+        XLALSimInspiralFD(htilde_plus, htilde_cross, p.m1, p.m2, p.s1x, p.s1y, p.s1z, p.s2x, p.s2y, p.s2z, p.distance, p.inclination, p.phiRef, p.longAscNodes, p.eccentricity, p.meanPerAno, deltaF, p.f_min, 0.5 * p.srate, p.fRef, p.params, p.MLens, p.yLens, p.approx);
         if (p.verbose)
             fprintf(stderr, "generation took %g seconds\n", (double)(clock() - timer_start) / CLOCKS_PER_SEC);
     } else if (p.domain == LAL_SIM_DOMAIN_FREQUENCY) {
@@ -520,7 +524,7 @@ int create_fd_waveform(COMPLEX16FrequencySeries ** htilde_plus, COMPLEX16Frequen
             fprintf(stderr, "generating waveform in frequency domain using XLALSimInspiralChooseFDWaveform...\n");
             timer_start = clock();
         }
-        XLALSimInspiralChooseFDWaveform(htilde_plus, htilde_cross, p.m1, p.m2, p.s1x, p.s1y, p.s1z, p.s2x, p.s2y, p.s2z, p.distance, p.inclination, p.phiRef, p.longAscNodes, p.eccentricity, p.meanPerAno, deltaF, p.f_min, 0.5 * p.srate, p.fRef, p.params, p.approx);
+        XLALSimInspiralChooseFDWaveform(htilde_plus, htilde_cross, p.m1, p.m2, p.s1x, p.s1y, p.s1z, p.s2x, p.s2y, p.s2z, p.distance, p.inclination, p.phiRef, p.longAscNodes, p.eccentricity, p.meanPerAno, deltaF, p.f_min, 0.5 * p.srate, p.fRef, p.params, p.MLens, p.yLens, p.approx);
         if (p.verbose)
             fprintf(stderr, "generation took %g seconds\n", (double)(clock() - timer_start) / CLOCKS_PER_SEC);
     } else {
@@ -533,7 +537,7 @@ int create_fd_waveform(COMPLEX16FrequencySeries ** htilde_plus, COMPLEX16Frequen
             fprintf(stderr, "generating waveform in time domain using XLALSimInspiralChooseTDWaveform...\n");
             timer_start = clock();
         }
-        XLALSimInspiralChooseTDWaveform(&h_plus, &h_cross, p.m1, p.m2, p.s1x, p.s1y, p.s1z, p.s2x, p.s2y, p.s2z, p.distance, p.inclination, p.phiRef, p.longAscNodes, p.eccentricity, p.meanPerAno, 1.0 / p.srate, p.f_min, p.fRef, p.params, p.approx);
+        XLALSimInspiralChooseTDWaveform(&h_plus, &h_cross, p.m1, p.m2, p.s1x, p.s1y, p.s1z, p.s2x, p.s2y, p.s2z, p.distance, p.inclination, p.phiRef, p.longAscNodes, p.eccentricity, p.meanPerAno, 1.0 / p.srate, p.f_min, p.fRef, p.params, p.MLens, p.yLens, p.approx);
         if (p.verbose)
             fprintf(stderr, "generation took %g seconds\n", (double)(clock() - timer_start) / CLOCKS_PER_SEC);
 
@@ -794,6 +798,8 @@ struct params parseargs(int argc, char **argv)
         .s2y = DEFAULT_S2Y,
         .s2z = DEFAULT_S2Z,
         .params = NULL
+        .MLens = DEFAULT_MLENS,
+        .yLens = DEFAULT_YLENS
     };
     struct LALoption long_options[] = {
         {"help", no_argument, 0, 'h'},
@@ -834,6 +840,8 @@ struct params parseargs(int argc, char **argv)
         {"axis", required_argument, 0, 'A'},
         {"modes", required_argument, 0, 'n'},
         {"params", required_argument, 0, 'p'},
+        {"MLens", no_argument, 0, '7'},
+        {"yLens", no_argument, 0, '8'},
         {0, 0, 0, 0}
     };
     char args[] = "hvCFcPa:w:D:O:o:u:U:W:e:r:R:M:m:X:x:Y:y:Z:z:L:l:q:Q:s:t:f:d:i:A:n:p:";
@@ -1021,6 +1029,12 @@ struct params parseargs(int argc, char **argv)
                 XLALDictInsertREAL8Value(p.params, key, atof(kv));
             }
             break;
+        case '7':
+                p.MLens = atof(LALoptarg);
+                break;
+        case '8':
+                p.yLens = atof(LALoptarg);
+                break;
         case '?':
         default:
             fprintf(stderr, "unknown error while parsing options\n");
