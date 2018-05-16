@@ -19,9 +19,13 @@
 
 #include <complex.h>
 #include <math.h>
+#include "LUTLensingStellar.h"
+#include "LUTLensingIMBH.h"
 
 #include <gsl/gsl_const.h>
 #include <gsl/gsl_errno.h>
+#include <gsl/gsl_interp2d.h>
+#include <gsl/gsl_spline2d.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_odeiv.h>
 
@@ -281,8 +285,117 @@ static double fixReferenceFrequency(const double f_ref, const double f_min, cons
 /*
  * some helper routines for XLALSimInspiralTD
  */
-static int XLALSimInspiralTDFromTD(REAL8TimeSeries **hplus, REAL8TimeSeries **hcross, REAL8 m1, REAL8 m2, REAL8 S1x, REAL8 S1y, REAL8 S1z, REAL8 S2x, REAL8 S2y, REAL8 S2z, REAL8 distance, REAL8 inclination, REAL8 phiRef, REAL8 longAscNodes, REAL8 eccentricity, REAL8 meanPerAno, REAL8 deltaT, REAL8 f_min, REAL8 f_ref, LALDict *LALparams, Approximant approximant);
-static int XLALSimInspiralTDFromFD(REAL8TimeSeries **hplus, REAL8TimeSeries **hcross, REAL8 m1, REAL8 m2, REAL8 S1x, REAL8 S1y, REAL8 S1z, REAL8 S2x, REAL8 S2y, REAL8 S2z, REAL8 distance, REAL8 inclination, REAL8 phiRef, REAL8 longAscNodes, REAL8 eccentricity, REAL8 meanPerAno, REAL8 deltaT, REAL8 f_min, REAL8 f_ref, LALDict *LALparams, Approximant approximant);
+static int XLALSimInspiralTDFromTD(REAL8TimeSeries **hplus, REAL8TimeSeries **hcross, REAL8 m1, REAL8 m2, REAL8 S1x, REAL8 S1y, REAL8 S1z, REAL8 S2x, REAL8 S2y, REAL8 S2z, REAL8 distance, REAL8 inclination, REAL8 phiRef, REAL8 longAscNodes, REAL8 eccentricity, REAL8 meanPerAno, REAL8 deltaT, REAL8 f_min, REAL8 f_ref, LALDict *LALparams, REAL8 MLens, REAL8 yLens, Approximant approximant);
+static int XLALSimInspiralTDFromFD(REAL8TimeSeries **hplus, REAL8TimeSeries **hcross, REAL8 m1, REAL8 m2, REAL8 S1x, REAL8 S1y, REAL8 S1z, REAL8 S2x, REAL8 S2y, REAL8 S2z, REAL8 distance, REAL8 inclination, REAL8 phiRef, REAL8 longAscNodes, REAL8 eccentricity, REAL8 meanPerAno, REAL8 deltaT, REAL8 f_min, REAL8 f_ref, LALDict *LALparams, REAL8 MLens, REAL8 yLens, Approximant approximant);
+
+/**
+ * Point Mass Lens model for lensing
+ *
+ *
+ */
+
+int XLALSimInspiralPointMassLensLUTIMBH(COMPLEX16FrequencySeries **F, REAL8Sequence *omega, REAL8 y)
+{
+    
+    const gsl_interp2d_type *RE1 = gsl_interp2d_bilinear;
+    const gsl_interp2d_type *IM1 = gsl_interp2d_bilinear;
+    const gsl_interp2d_type *RE2 = gsl_interp2d_bilinear;
+    const gsl_interp2d_type *IM2 = gsl_interp2d_bilinear;
+
+    gsl_spline2d *splineR1 = gsl_spline2d_alloc(RE1, OMEGA_LIST_MAX, Y_LIST_MAX);
+    gsl_spline2d *splineI1 = gsl_spline2d_alloc(IM1, OMEGA_LIST_MAX, Y_LIST_MAX);
+    gsl_interp_accel *xacc1 = gsl_interp_accel_alloc();
+    gsl_interp_accel *yacc1 = gsl_interp_accel_alloc();
+    gsl_spline2d_init(splineR1, OmegaDataStellar, yDataStellar, reFDataStellar, OMEGA_LIST_MAX, Y_LIST_MAX);
+    gsl_spline2d_init(splineI1, OmegaDataStellar, yDataStellar, imFDataStellar, OMEGA_LIST_MAX, Y_LIST_MAX);
+    
+    
+    gsl_spline2d *splineR2 = gsl_spline2d_alloc(RE2, OMEGAIMBH_LIST_MAX, YIMBH_LIST_MAX);
+    gsl_spline2d *splineI2 = gsl_spline2d_alloc(IM2, OMEGAIMBH_LIST_MAX, YIMBH_LIST_MAX);
+    gsl_interp_accel *xacc2 = gsl_interp_accel_alloc();
+    gsl_interp_accel *yacc2 = gsl_interp_accel_alloc();
+    gsl_spline2d_init(splineR2, OmegaDataIMBH, yDataIMBH, reFDataIMBH, OMEGAIMBH_LIST_MAX, YIMBH_LIST_MAX);
+    gsl_spline2d_init(splineI2, OmegaDataIMBH, yDataIMBH, imFDataIBMH, OMEGAIMBH_LIST_MAX, YIMBH_LIST_MAX);
+    
+    REAL8 aux = sqrt(pow(y,2) + 4);
+    REAL8 muplus = 0.5 + (pow(y,2) + 2)/(2*y*aux);
+    REAL8 muminus = 0.5 - (pow(y,2) + 2)/(2*y*aux);
+    REAL8 sqplus = sqrt(fabs(muplus));
+    REAL8 sqminus = sqrt(fabs(muminus));
+    REAL8 ftdelay;
+    
+    REAL8 reF;
+    REAL8 imF;
+    
+    if(y<0.3)
+    {
+        for(UINT4 i=0; i<omega->length; i++)
+        {
+            if(omega->data[i]>0.01&&omega->data[i]<=75.0)
+            {
+                reF = gsl_spline2d_eval(splineR1, omega->data[i], y, xacc1, yacc1);
+                imF = gsl_spline2d_eval(splineI1, omega->data[i], y, xacc1, yacc1);
+                (*F)->data->data[i] = reF + I*imF;
+            }
+            else if(omega->data[i]>75.0 && omega->data[i]<2575.)
+            {
+                reF = gsl_spline2d_eval(splineR2, omega->data[i], y, xacc2, yacc2);
+                imF = gsl_spline2d_eval(splineI2, omega->data[i], y, xacc2, yacc2);
+                (*F)->data->data[i] = reF + I*imF;
+            }
+            else if(omega->data[i]<=0.01)
+            {
+                (*F)->data->data[i] = 0.0;
+            }
+            else if(omega->data[i]>=2575.)
+            {
+                ftdelay = (1./(2*LAL_PI))*omega->data[i]*(0.5*y*aux + log((aux + y)/(aux - y)));
+                (*F)->data->data[i] = sqplus - I*sqminus*cexp(2*LAL_PI*I*ftdelay);
+            }
+        }
+    }
+    else if(y>=0.3 && y<1.2)
+    {
+        
+        for(UINT4 i=0; i<omega->length; i++)
+        {
+            if(omega->data[i]>0.01&&omega->data[i]<=75.0)
+            {
+                reF = gsl_spline2d_eval(splineR1, omega->data[i], y, xacc1, yacc1);
+                imF = gsl_spline2d_eval(splineI1, omega->data[i], y, xacc1, yacc1);
+                (*F)->data->data[i] = reF + I*imF;
+            }
+            else if(omega->data[i]>75.0)
+            {
+                ftdelay = (1./(2*LAL_PI))*omega->data[i]*(0.5*y*aux + log((aux + y)/(aux - y)));
+                (*F)->data->data[i] = sqplus - I*sqminus*cexp(2*LAL_PI*I*ftdelay);
+            }
+            else if(omega->data[i]<=0.01)
+            {
+                (*F)->data->data[i] = 0.0;
+            }
+        }
+    }
+    else if(y>=1.2)
+    {
+        for(UINT4 i=0; i<omega->length; i++)
+        {
+            ftdelay = (1./(2*LAL_PI))*omega->data[i]*(0.5*y*aux + log((aux + y)/(aux - y)));
+            (*F)->data->data[i] = sqplus - I*sqminus*cexp(2*LAL_PI*I*ftdelay);
+        }
+    }
+    gsl_spline2d_free(splineR1);
+    gsl_spline2d_free(splineI1);
+    gsl_spline2d_free(splineR2);
+    gsl_spline2d_free(splineI2);
+    gsl_interp_accel_free(xacc1);
+    gsl_interp_accel_free(xacc2);
+    gsl_interp_accel_free(yacc1);
+    gsl_interp_accel_free(yacc2);;
+    return 0;
+    
+}
+
 
 /**
  * @addtogroup LALSimInspiral_c
@@ -324,6 +437,8 @@ int XLALSimInspiralChooseTDWaveform(
     const REAL8 f_min,                          /**< starting GW frequency (Hz) */
     REAL8 f_ref,                                /**< reference GW frequency (Hz) */
     LALDict *LALparams,                         /**< LAL dictionary containing accessory parameters */
+    const REAL8 MLens,
+    const REAL8 yLens,
     const Approximant approximant               /**< post-Newtonian approximant to use for waveform production */
     )
 {
@@ -722,7 +837,7 @@ int XLALSimInspiralChooseTDWaveform(
 	    // generate TD waveforms with zero inclincation so that amplitude can be
 	    // calculated from hplus and hcross, apply inclination-dependent factors
 	    // in loop below
-	    ret = XLALSimInspiralTDFromFD(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, 0., phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, f_min, f_ref, LALparams, approximant);
+	    ret = XLALSimInspiralTDFromFD(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, 0., phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, f_min, f_ref, LALparams,MLens,yLens, approximant);
 	    REAL8 maxamp=0;
 	    REAL8TimeSeries *hp = *hplus;
 	    REAL8TimeSeries *hc = *hcross;
@@ -748,7 +863,7 @@ int XLALSimInspiralChooseTDWaveform(
 	    break;
 
 	case IMRPhenomPv2:
-	    ret = XLALSimInspiralTDFromFD(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, f_min, f_ref, LALparams, approximant);
+	    ret = XLALSimInspiralTDFromFD(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, f_min, f_ref, LALparams,MLens,yLens, approximant);
 	    break;
 
         case PhenSpinTaylorRD:
@@ -923,6 +1038,8 @@ int XLALSimInspiralChooseFDWaveform(
     const REAL8 f_max,                      /**< ending GW frequency (Hz) */
     REAL8 f_ref,                            /**< Reference frequency (Hz) */
     LALDict *LALparams,                     /**< LAL dictionary containing accessory parameters */
+    const REAL8 MLens,
+    const REAL8 yLens,
     const Approximant approximant           /**< post-Newtonian approximant to use for waveform production */
     )
 {
@@ -1563,6 +1680,31 @@ int XLALSimInspiralChooseFDWaveform(
       }
     }
 
+	// Lensing functions
+    if(MLens!=0.0 && MLens>0. && yLens>0.)
+    {
+        int bb;
+        COMPLEX16FrequencySeries *F = XLALCreateCOMPLEX16FrequencySeries("Flens", &((*hptilde)->epoch), (*hptilde)->f0, (*hptilde)->deltaF, &lalDimensionlessUnit, (*hptilde)->data->length);
+        REAL8 df = F->deltaF;
+        REAL8Sequence *w = XLALCreateREAL8Sequence(F->data->length);
+        for(UINT4 i = 1; i < F->data->length; i++)
+        {
+            w->data[i] = 8*LAL_PI*MLens*LAL_MTSUN_SI*i*df;
+        }
+        w->data[0] = w->data[1];
+        
+        bb = XLALSimInspiralPointMassLensLUTIMBH(&F, w, yLens);
+        
+        for(UINT4 i = 0; i < F->data->length; i++)
+        {
+            (*hptilde)->data->data[i] *= (F)->data->data[i];
+            (*hctilde)->data->data[i] *= (F)->data->data[i];
+        }
+        
+        XLALDestroyCOMPLEX16FrequencySeries(F);
+        XLALDestroyREAL8Sequence(w);
+    }
+
     if (ret == XLAL_FAILURE) XLAL_ERROR(XLAL_EFUNC);
 
     return ret;
@@ -1613,6 +1755,8 @@ SphHarmTimeSeries* XLALSimInspiralTDModesFromPolarizations(
     REAL8 f_min,                                /**< starting GW frequency (Hz) */
     REAL8 f_ref,                                /**< reference GW frequency (Hz) */
     LALDict *LALparams,                         /**< LAL dictionary containing accessory parameters */
+    REAL8 MLens,
+    REAL8 yLens,
     Approximant approximant                     /**< post-Newtonian approximant to use for waveform production */
     )
 {
@@ -1624,7 +1768,7 @@ SphHarmTimeSeries* XLALSimInspiralTDModesFromPolarizations(
     float fac = XLALSpinWeightedSphericalHarmonic(0., 0., -2, 2,2);
 
     /* Generate waveform via on-axis emission. Assumes only (2,2) and (2,-2) emission */
-    retval = XLALSimInspiralTD(&hplus, &hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, f_min, f_ref, LALparams, approximant);
+    retval = XLALSimInspiralTD(&hplus, &hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, f_min, f_ref, LALparams, MLens, yLens, approximant);
     if (retval < 0)
         XLAL_ERROR_NULL(XLAL_EFUNC);
 
@@ -1671,6 +1815,8 @@ static int XLALSimInspiralTDFromTD(
     REAL8 f_min,                                /**< starting GW frequency (Hz) */
     REAL8 f_ref,                                /**< reference GW frequency (Hz) */
     LALDict *LALparams,                         /**< LAL dictionary containing accessory parameters */
+    REAL8 MLens,
+    REAL8 yLens,
     Approximant approximant                     /**< post-Newtonian approximant to use for waveform production */
 )
 {
@@ -1729,7 +1875,7 @@ static int XLALSimInspiralTDFromTD(
     fstart = XLALSimInspiralChirpStartFrequencyBound((1.0 + extra_time_fraction) * tchirp + tmerge + textra, m1, m2);
 
     /* generate the waveform in the time domain starting at fstart */
-    retval = XLALSimInspiralChooseTDWaveform(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, fstart, f_ref, LALparams, approximant);
+    retval = XLALSimInspiralChooseTDWaveform(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, fstart, f_ref, LALparams, MLens,yLens, approximant);
     if (retval < 0)
         XLAL_ERROR(XLAL_EFUNC);
 
@@ -1770,6 +1916,8 @@ static int XLALSimInspiralTDFromFD(
     REAL8 f_min,                                /**< starting GW frequency (Hz) */
     REAL8 f_ref,                                /**< reference GW frequency (Hz) */
     LALDict *LALparams,                         /**< LAL dictionary containing accessory parameters */
+    REAL8 MLens,
+    REAL8 yLens,
     Approximant approximant                     /**< post-Newtonian approximant to use for waveform production */
 )
 {
@@ -1830,7 +1978,7 @@ static int XLALSimInspiralTDFromFD(
     /* generate the conditioned waveform in the frequency domain */
     /* note: redshift factor has already been applied above */
     /* set deltaF = 0 to get a small enough resolution */
-    retval = XLALSimInspiralFD(&hptilde, &hctilde, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, 0.0, f_min, f_max, f_ref, LALparams, approximant);
+    retval = XLALSimInspiralFD(&hptilde, &hctilde, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, 0.0, f_min, f_max, f_ref, LALparams, MLens, yLens, approximant);
     if (retval < 0)
         XLAL_ERROR(XLAL_EFUNC);
 
@@ -1944,15 +2092,17 @@ int XLALSimInspiralTD(
     REAL8 f_min,                                /**< starting GW frequency (Hz) */
     REAL8 f_ref,                                /**< reference GW frequency (Hz) */
     LALDict *LALparams,                         /**< LAL dictionary containing accessory parameters */
+    REAL8 MLens,
+    REAL8 yLens,
     Approximant approximant                     /**< post-Newtonian approximant to use for waveform production */
     )
 {
     /* call the appropriate helper routine */
     if (XLALSimInspiralImplementedTDApproximants(approximant)) {
-        if (XLALSimInspiralTDFromTD(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, f_min, f_ref, LALparams, approximant) < 0)
+        if (XLALSimInspiralTDFromTD(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, f_min, f_ref, LALparams, MLens, yLens, approximant) < 0)
             XLAL_ERROR(XLAL_EFUNC);
     } else if (XLALSimInspiralImplementedFDApproximants(approximant)) {
-        if (XLALSimInspiralTDFromFD(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, f_min, f_ref, LALparams, approximant) < 0)
+        if (XLALSimInspiralTDFromFD(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, f_min, f_ref, LALparams, MLens, yLens, approximant) < 0)
             XLAL_ERROR(XLAL_EFUNC);
     } else
         XLAL_ERROR(XLAL_EINVAL, "Invalid approximant");
@@ -2017,6 +2167,8 @@ int XLALSimInspiralFD(
     REAL8 f_max,                            /**< ending GW frequency (Hz) */
     REAL8 f_ref,                            /**< Reference frequency (Hz) */
     LALDict *LALparams,                     /**< LAL dictionary containing accessory parameters */
+    REAL8 MLens,
+    REAL8 yLens,
     Approximant approximant                 /**< post-Newtonian approximant to use for waveform production */
     )
 {
@@ -2114,7 +2266,7 @@ int XLALSimInspiralFD(
             XLAL_PRINT_WARNING("Specified frequency interval of %g Hz is too large for a chirp of duration %g s", deltaF, chirplen * deltaT);
 
         /* generate the waveform in the frequency domain starting at fstart */
-        retval = XLALSimInspiralChooseFDWaveform(hptilde, hctilde, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaF, fstart, f_max, f_ref, LALparams, approximant);
+        retval = XLALSimInspiralChooseFDWaveform(hptilde, hctilde, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaF, fstart, f_max, f_ref, LALparams, MLens, yLens, approximant);
         if (retval < 0)
             XLAL_ERROR(XLAL_EFUNC);
 
@@ -2159,7 +2311,7 @@ int XLALSimInspiralFD(
         REAL8FFTPlan *plan;
 
         /* generate conditioned waveform in time domain */
-        retval = XLALSimInspiralTD(&hplus, &hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, f_min, f_ref, LALparams, approximant);
+        retval = XLALSimInspiralTD(&hplus, &hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, longAscNodes, eccentricity, meanPerAno, deltaT, f_min, f_ref, LALparams, MLens, yLens, approximant);
         if (retval < 0)
             XLAL_ERROR(XLAL_EFUNC);
 
@@ -2240,6 +2392,8 @@ int XLALSimInspiralChooseWaveform(
     const REAL8 f_min,                                /**< starting GW frequency (Hz) */
     const REAL8 f_ref,                                /**< reference GW frequency (Hz) */
     LALDict *LALpars,                                 /**< LAL dictionary containing accessory parameters */
+    const REAL8 MLens,
+    const REAL8 yLens,
     const Approximant approximant                     /**< post-Newtonian approximant to use for waveform production */)
 {
     XLAL_PRINT_DEPRECATION_WARNING("XLALSimInspiralChooseTDWaveform");
@@ -2247,7 +2401,7 @@ int XLALSimInspiralChooseWaveform(
     return XLALSimInspiralChooseTDWaveform(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z,
 					   distance, inclination, phiRef, longAscNodes,
 					   eccentricity, meanPerAno, deltaT, f_min, f_ref,
-					   LALpars, approximant);
+					   LALpars,MLens,yLens, approximant);
 }
 
 /** @} */
