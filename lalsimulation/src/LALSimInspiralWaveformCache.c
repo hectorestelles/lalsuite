@@ -52,6 +52,8 @@ static CacheVariableDiffersBitmask CacheArgsDifferenceBitmask(
         REAL8 r,
         REAL8 i,
 	LALDict *LALpars,
+	REAL8 MLens,
+        REAL8 yLens,
         Approximant approximant,
         REAL8Sequence *frequencies);
 
@@ -71,6 +73,8 @@ static int StoreTDHCache(LALSimInspiralWaveformCache *cache,
         REAL8 r,
         REAL8 i,
         LALDict *LALpars,
+	REAL8 MLens,
+        REAL8 yLens,
         Approximant approximant);
 
 static int StoreFDHCache(LALSimInspiralWaveformCache *cache,
@@ -85,6 +89,8 @@ static int StoreFDHCache(LALSimInspiralWaveformCache *cache,
         REAL8 r,
         REAL8 i,
         LALDict *LALpars,
+	REAL8 MLens,
+        REAL8 yLens,
         Approximant approximant,
         REAL8Sequence *frequencies);
 
@@ -122,6 +128,8 @@ int XLALSimInspiralChooseTDWaveformFromCache(
         REAL8 r,                                /**< distance of source (m) */
         REAL8 i,                                /**< inclination of source (rad) */
         LALDict *LALpars,                       /**< LALDictionary containing non-mandatory variables/flags */
+	REAL8 MLens,
+        REAL8 yLens,
         Approximant approximant,                /**< post-Newtonian approximant to use for waveform production */
         LALSimInspiralWaveformCache *cache      /**< waveform cache structure; use NULL for no caching */
         )
@@ -136,13 +144,13 @@ int XLALSimInspiralChooseTDWaveformFromCache(
     if ( !XLALSimInspiralWaveformParamsNonGRAreDefault(LALpars) || (!cache) )
 
       return XLALSimInspiralChooseTDWaveform(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z,
-					     r, i, phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars,
+					     r, i, phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars,MLens,yLens,
 					     approximant);
 
     // Check which parameters have changed
     changedParams = CacheArgsDifferenceBitmask(cache, phiRef, deltaT,
             m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, 0., r, i,
-            LALpars, approximant, NULL);
+            LALpars,MLens,yLens, approximant, NULL);
 
     // No parameters have changed! Copy the cached polarizations
     if( changedParams == NO_DIFFERENCE ) {
@@ -164,13 +172,13 @@ int XLALSimInspiralChooseTDWaveformFromCache(
     if( (changedParams & INTRINSIC) != 0 ) {
 
         status = XLALSimInspiralChooseTDWaveform(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z,
-						 r, i, phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars,
+						 r, i, phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars,MLens,yLens,
 						 approximant);
         if (status == XLAL_FAILURE) return status;
 
         // FIXME: Need to add hlms, dynamic variables, etc. in cache
         return StoreTDHCache(cache, *hplus, *hcross, phiRef, deltaT, m1, m2,
-			     S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, r, i, LALpars, approximant);
+			     S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, r, i, LALpars,MLens,yLens, approximant);
     }
 
     INT4 ampO=XLALSimInspiralWaveformParamsLookupPNAmplitudeOrder(LALpars);
@@ -181,14 +189,14 @@ int XLALSimInspiralChooseTDWaveformFromCache(
         if( cache->hplus == NULL || cache->hcross == NULL) {
             status = XLALSimInspiralChooseTDWaveform(hplus, hcross, m1, m2,
 						     S1x, S1y, S1z, S2x, S2y, S2z, r, i,
-						     phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars,
+						     phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars,MLens,yLens,
 						     approximant);
             if (status == XLAL_FAILURE) return status;
 
             // FIXME: Need to add hlms, dynamic variables, etc. in cache
             return StoreTDHCache(cache, *hplus, *hcross, phiRef, deltaT, m1, m2,
                     S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, r, i,
-		    LALpars, approximant);
+		    LALpars,MLens,yLens, approximant);
         }
 
         if( changedParams & INCLINATION ) {
@@ -197,13 +205,13 @@ int XLALSimInspiralChooseTDWaveformFromCache(
             status = XLALSimInspiralChooseTDWaveform(hplus, hcross, m1, m2,
 						     S1x, S1y, S1z, S2x, S2y, S2z, r, i,
 						     phiRef, 0., 0., 0., deltaT, f_min, f_ref,
-						     LALpars, approximant);
+						     LALpars,MLens,yLens, approximant);
             if (status == XLAL_FAILURE) return status;
 
             // FIXME: Need to add hlms, dynamic variables, etc. in cache
             return StoreTDHCache(cache, *hplus, *hcross, phiRef, deltaT, m1, m2,
                     S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, r, i,
-                    LALpars, approximant);
+                    LALpars,MLens,yLens, approximant);
         }
         if( changedParams & PHI_REF ) {
             // FIXME: For now just treat as intrinsic parameter.
@@ -211,13 +219,13 @@ int XLALSimInspiralChooseTDWaveformFromCache(
             status = XLALSimInspiralChooseTDWaveform(hplus, hcross, m1, m2,
 						     S1x, S1y, S1z, S2x, S2y, S2z, r, i,
 						     phiRef, 0., 0., 0., deltaT, f_min, f_ref,
-						     LALpars, approximant);
+						     LALpars,MLens,yLens, approximant);
             if (status == XLAL_FAILURE) return status;
 
             // FIXME: Need to add hlms, dynamic variables, etc. in cache
             return StoreTDHCache(cache, *hplus, *hcross, phiRef, deltaT, m1, m2,
                     S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, r, i,
-		    LALpars, approximant);
+		    LALpars,MLens,yLens, approximant);
         }
         if( (changedParams & DISTANCE) != 0 ) {
             // Return rescaled copy of cached polarizations
@@ -257,13 +265,13 @@ int XLALSimInspiralChooseTDWaveformFromCache(
         if( cache->hplus == NULL || cache->hcross == NULL) {
             status = XLALSimInspiralChooseTDWaveform(hplus, hcross, m1, m2,
 						     S1x, S1y, S1z, S2x, S2y, S2z, r, i,
-						     phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars, approximant);
+						     phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars,MLens,yLens, approximant);
             if (status == XLAL_FAILURE) return status;
 
             // FIXME: Need to add hlms, dynamic variables, etc. in cache
             return StoreTDHCache(cache, *hplus, *hcross, phiRef, deltaT, m1, m2,
                     S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, r, i,
-                    LALpars, approximant);
+                    LALpars,MLens,yLens, approximant);
         }
 
         // Set transformation coefficients for identity transformation.
@@ -331,13 +339,13 @@ int XLALSimInspiralChooseTDWaveformFromCache(
             // FIXME: This will change to a code-path: inputs->hlms->{h+,hx}
             status = XLALSimInspiralChooseTDWaveform(hplus, hcross, m1, m2,
 						     S1x, S1y, S1z, S2x, S2y, S2z, r, i,
-						     phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars, approximant);
+						     phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars,MLens,yLens, approximant);
             if (status == XLAL_FAILURE) return status;
 
             // FIXME: Need to add hlms, dynamic variables, etc. in cache
             return StoreTDHCache(cache, *hplus, *hcross, phiRef, deltaT, m1, m2,
                     S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, r, i,
-                    LALpars, approximant);
+                    LALpars,MLens,yLens, approximant);
         }
 
         if( changedParams & INCLINATION) {
@@ -345,13 +353,13 @@ int XLALSimInspiralChooseTDWaveformFromCache(
             // Will come back and put in transformation
             status = XLALSimInspiralChooseTDWaveform(hplus, hcross, m1, m2,
 						     S1x, S1y, S1z, S2x, S2y, S2z, r, i,
-						     phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars, approximant);
+						     phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars,MLens,yLens, approximant);
             if (status == XLAL_FAILURE) return status;
 
             // FIXME: Need to add hlms, dynamic variables, etc. in cache
             return StoreTDHCache(cache, *hplus, *hcross, phiRef, deltaT, m1, m2,
                     S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, r, i,
-                    LALpars, approximant);
+                    LALpars,MLens,yLens, approximant);
 
         }
         if( changedParams & PHI_REF ) {
@@ -359,14 +367,14 @@ int XLALSimInspiralChooseTDWaveformFromCache(
             // Will come back and put in transformation
             status = XLALSimInspiralChooseTDWaveform(hplus, hcross, m1, m2,
 						     S1x, S1y, S1z, S2x, S2y, S2z, r, i,
-						     phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars,
+						     phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars,MLens,yLens,
 						     approximant);
             if (status == XLAL_FAILURE) return status;
 
             // FIXME: Need to add hlms, dynamic variables, etc. in cache
             return StoreTDHCache(cache, *hplus, *hcross, phiRef, deltaT, m1, m2,
                     S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, r, i,
-                    LALpars, approximant);
+                    LALpars,MLens,yLens, approximant);
 
         }
         if( changedParams & DISTANCE ) {
@@ -405,7 +413,7 @@ int XLALSimInspiralChooseTDWaveformFromCache(
     else {
         return XLALSimInspiralChooseTDWaveform(hplus, hcross, m1, m2,
 					       S1x, S1y, S1z, S2x, S2y, S2z, r, i,
-					       phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars, approximant);
+					       phiRef, 0., 0., 0., deltaT, f_min, f_ref, LALpars,MLens,yLens, approximant);
     }
 }
 
@@ -438,6 +446,8 @@ int XLALSimInspiralChooseFDWaveformFromCache(
         REAL8 r,                                /**< distance of source (m) */
         REAL8 i,                                /**< inclination of source (rad) */
         LALDict *LALpars,                       /**< LALDictionary containing non-mandatory variables/flags */
+	REAL8 MLens,
+        REAL8 yLens,
         Approximant approximant,                /**< post-Newtonian approximant to use for waveform production */
         LALSimInspiralWaveformCache *cache,     /**< waveform cache structure */
         REAL8Sequence *frequencies              /**< sequence of frequencies for which the waveform will be computed. Pass in NULL (or None in python) for standard f_min to f_max sequence. */
@@ -461,14 +471,14 @@ int XLALSimInspiralChooseFDWaveformFromCache(
             return XLALSimInspiralChooseFDWaveform(hptilde, hctilde, m1, m2,
 				S1x, S1y, S1z, S2x, S2y, S2z, r, i, phiRef,
 				0., 0., 0., deltaF, f_min, f_max, f_ref,
-				LALpars,
+				LALpars,MLens, yLens,
 				approximant);
     }
 
     // Check which parameters have changed
     changedParams = CacheArgsDifferenceBitmask(cache, phiRef, deltaF,
             m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, f_max, r, i,
-	    LALpars, approximant, frequencies);
+	    LALpars,MLens, yLens, approximant, frequencies);
 
     // No parameters have changed! Copy the cached polarizations
     if( changedParams == NO_DIFFERENCE ) {
@@ -498,12 +508,12 @@ int XLALSimInspiralChooseFDWaveformFromCache(
 						   S1x, S1y, S1z, S2x, S2y, S2z,
 						   r, i, phiRef, 0., 0., 0.,
 						   deltaF, f_min, f_max, f_ref,
-						   LALpars, approximant);
+						   LALpars,MLens, yLens, approximant);
         }
         if (status == XLAL_FAILURE) return status;
 
         return StoreFDHCache(cache, *hptilde, *hctilde, phiRef, deltaF, m1, m2,
-			     S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, f_max, r, i, LALpars, approximant, frequencies);
+			     S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, f_max, r, i, LALpars,MLens, yLens, approximant, frequencies);
     }
 
     // case 1: Non-precessing, 2nd harmonic only
@@ -523,13 +533,13 @@ int XLALSimInspiralChooseFDWaveformFromCache(
 	      status = XLALSimInspiralChooseFDWaveform(hptilde, hctilde, m1, m2,
 						       S1x, S1y, S1z, S2x, S2y, S2z, r, i, phiRef,
 						       0., 0., 0., deltaF, f_min, f_max, f_ref,
-						       LALpars, approximant);
+						       LALpars,MLens, yLens, approximant);
             }
             if (status == XLAL_FAILURE) return status;
 
             return StoreFDHCache(cache, *hptilde, *hctilde, phiRef, deltaF,
                     m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, f_min, f_ref, f_max, r, i,
-                    LALpars, approximant, frequencies);
+                    LALpars,MLens, yLens, approximant, frequencies);
         }
 
         // Set transformation coefficients for identity transformation.
@@ -603,7 +613,7 @@ int XLALSimInspiralChooseFDWaveformFromCache(
 						 S1x, S1y, S1z, S2x, S2y, S2z,
 						 r, i, phiRef, 0., 0., 0.,
 						 deltaF, f_min, f_max, f_ref,
-						 NULL, approximant);
+						 NULL,MLens, yLens, approximant);
         }
     }
 
@@ -655,6 +665,8 @@ static CacheVariableDiffersBitmask CacheArgsDifferenceBitmask(
         REAL8 r,
         REAL8 i,
 	LALDict *LALpars,
+	REAL8 MLens,
+        REAL8 yLens,
         Approximant approximant,
         REAL8Sequence *frequencies
         )
@@ -681,7 +693,8 @@ static CacheVariableDiffersBitmask CacheArgsDifferenceBitmask(
     if ( XLALSimInspiralWaveformParamsLookupTidalLambda2(LALpars) != XLALSimInspiralWaveformParamsLookupTidalLambda2(cache->LALpars)) return INTRINSIC;
     if ( XLALSimInspiralWaveformParamsLookupPNAmplitudeOrder(LALpars) != XLALSimInspiralWaveformParamsLookupPNAmplitudeOrder(cache->LALpars)) return INTRINSIC;
     if ( XLALSimInspiralWaveformParamsLookupPNAmplitudeOrder(LALpars) != XLALSimInspiralWaveformParamsLookupPNAmplitudeOrder(cache->LALpars)) return INTRINSIC;
-
+    if ( MLens != cache->MLens) return INTRINSIC;
+    if ( yLens != cache->yLens) return INTRINSIC;
     if ( approximant != cache->approximant) return INTRINSIC;
 
     if (r != cache->r) difference = difference | DISTANCE;
@@ -726,6 +739,8 @@ static int StoreTDHCache(LALSimInspiralWaveformCache *cache,
         REAL8 r,
         REAL8 i,
         LALDict *LALpars,
+	REAL8 MLens,
+        REAL8 yLens,
         Approximant approximant
         )
 {
@@ -756,6 +771,8 @@ static int StoreTDHCache(LALSimInspiralWaveformCache *cache,
     cache->r = r;
     cache->i = i;
     cache->LALpars = LALpars;
+    cache->MLens = MLens;
+    cache->yLens = yLens;
     cache->approximant = approximant;
     cache->frequencies = NULL;
 
@@ -794,6 +811,8 @@ static int StoreFDHCache(LALSimInspiralWaveformCache *cache,
         REAL8 r,
         REAL8 i,
 	LALDict *LALpars,
+	REAL8 MLens,
+        REAL8 yLens,
         Approximant approximant,
         REAL8Sequence *frequencies
         )
@@ -826,6 +845,8 @@ static int StoreFDHCache(LALSimInspiralWaveformCache *cache,
     cache->r = r;
     cache->i = i;
     cache->LALpars = LALpars;
+    cache->MLens = MLens;
+    cache->yLens = yLens;
     cache->approximant = approximant;
 
     XLALDestroyREAL8Sequence(cache->frequencies);
