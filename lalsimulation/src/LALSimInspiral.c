@@ -1683,8 +1683,7 @@ int XLALSimInspiralChooseFDWaveform(
 	// Lensing functions
     if(MLens!=0.0 && MLens>0. && yLens>0.)
     {
-        int bb = 0;
-	
+        
         COMPLEX16FrequencySeries *F = XLALCreateCOMPLEX16FrequencySeries("Flens", &((*hptilde)->epoch), (*hptilde)->f0, (*hptilde)->deltaF, &lalDimensionlessUnit, (*hptilde)->data->length);
         REAL8 df = F->deltaF;
         REAL8Sequence *w = XLALCreateREAL8Sequence(F->data->length);
@@ -1694,7 +1693,7 @@ int XLALSimInspiralChooseFDWaveform(
         }
         w->data[0] = w->data[1];
         
-        bb = XLALSimInspiralPointMassLensLUTIMBH(&F, w, yLens);
+        ret = XLALSimInspiralPointMassLensLUTIMBH(&F, w, yLens);
         
         for(UINT4 i = 0; i < F->data->length; i++)
         {
