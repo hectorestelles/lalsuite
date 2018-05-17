@@ -1684,6 +1684,7 @@ int XLALSimInspiralChooseFDWaveform(
     if(MLens!=0.0 && MLens>0. && yLens>0.)
     {
         int bb;
+	bb = 0.;
         COMPLEX16FrequencySeries *F = XLALCreateCOMPLEX16FrequencySeries("Flens", &((*hptilde)->epoch), (*hptilde)->f0, (*hptilde)->deltaF, &lalDimensionlessUnit, (*hptilde)->data->length);
         REAL8 df = F->deltaF;
         REAL8Sequence *w = XLALCreateREAL8Sequence(F->data->length);
@@ -6285,7 +6286,7 @@ int XLALSimInspiralChooseTDWaveformOLD(
 	    // calculated from hplus and hcross, apply inclination-dependent factors
 	    // in loop below
             /* FIXME: BUSTED -- EXTRA PARAMS NOT IMPLEMENTED */
-	    ret = XLALSimInspiralTDFromFD(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, 0.0, phiRef, 0.0, 0.0, 0.0, deltaT, f_min, f_ref, NULL, approximant);
+	    ret = XLALSimInspiralTDFromFD(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, 0.0, phiRef, 0.0, 0.0, 0.0, deltaT, f_min, f_ref, NULL,0.,0., approximant);
 	    REAL8 maxamp=0;
 	    REAL8TimeSeries *hp = *hplus;
 	    REAL8TimeSeries *hc = *hcross;
@@ -6312,7 +6313,7 @@ int XLALSimInspiralChooseTDWaveformOLD(
 
 	case IMRPhenomPv2:
             /* FIXME: BUSTED -- EXTRA PARAMS NOT IMPLEMENTED */
-	    ret = XLALSimInspiralTDFromFD(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, 0.0, 0.0, 0.0, deltaT, f_min, f_ref, NULL, approximant);
+	    ret = XLALSimInspiralTDFromFD(hplus, hcross, m1, m2, S1x, S1y, S1z, S2x, S2y, S2z, distance, inclination, phiRef, 0.0, 0.0, 0.0, deltaT, f_min, f_ref, NULL,0.,0., approximant);
 	    break;
 
         case PhenSpinTaylorRD:
