@@ -797,7 +797,7 @@ struct params parseargs(int argc, char **argv)
         .s2x = DEFAULT_S2X,
         .s2y = DEFAULT_S2Y,
         .s2z = DEFAULT_S2Z,
-        .params = NULL
+        .params = NULL,
         .MLens = DEFAULT_MLENS,
         .yLens = DEFAULT_YLENS
     };
